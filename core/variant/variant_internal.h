@@ -84,6 +84,9 @@ public:
 			case Variant::ARRAY:
 				init_array(v);
 				break;
+			case Variant::SET:
+				init_set(v);
+				break;
 			case Variant::PACKED_BYTE_ARRAY:
 				init_byte_array(v);
 				break;
@@ -182,6 +185,8 @@ public:
 	_FORCE_INLINE_ static const Dictionary *get_dictionary(const Variant *v) { return reinterpret_cast<const Dictionary *>(v->_data._mem); }
 	_FORCE_INLINE_ static Array *get_array(Variant *v) { return reinterpret_cast<Array *>(v->_data._mem); }
 	_FORCE_INLINE_ static const Array *get_array(const Variant *v) { return reinterpret_cast<const Array *>(v->_data._mem); }
+	_FORCE_INLINE_ static Set *get_set(Variant *v) { return reinterpret_cast<Set *>(v->_data._mem); }
+	_FORCE_INLINE_ static const Set *get_set(const Variant *v) { return reinterpret_cast<const Set *>(v->_data._mem); }
 
 	// Typed arrays.
 	_FORCE_INLINE_ static PackedByteArray *get_byte_array(Variant *v) { return &static_cast<Variant::PackedArrayRef<uint8_t> *>(v->_data.packed_array)->array; }
@@ -273,6 +278,10 @@ public:
 	_FORCE_INLINE_ static void init_array(Variant *v) {
 		memnew_placement(v->_data._mem, Array);
 		v->type = Variant::ARRAY;
+	}
+	_FORCE_INLINE_ static void init_set(Variant *v) {
+		memnew_placement(v->_data._mem, Set);
+		v->type = Variant::SET;
 	}
 	_FORCE_INLINE_ static void init_byte_array(Variant *v) {
 		v->_data.packed_array = Variant::PackedArrayRef<uint8_t>::create(Vector<uint8_t>());
@@ -395,6 +404,8 @@ public:
 				return get_dictionary(v);
 			case Variant::ARRAY:
 				return get_array(v);
+			case Variant::SET:
+				return get_set(v);
 			case Variant::PACKED_BYTE_ARRAY:
 				return get_byte_array(v);
 			case Variant::PACKED_INT32_ARRAY:
@@ -479,6 +490,8 @@ public:
 				return get_dictionary(v);
 			case Variant::ARRAY:
 				return get_array(v);
+			case Variant::SET:
+				return get_set(v);
 			case Variant::PACKED_BYTE_ARRAY:
 				return get_byte_array(v);
 			case Variant::PACKED_INT32_ARRAY:
@@ -737,6 +750,12 @@ template <>
 struct VariantGetInternalPtr<Array> {
 	static Array *get_ptr(Variant *v) { return VariantInternal::get_array(v); }
 	static const Array *get_ptr(const Variant *v) { return VariantInternal::get_array(v); }
+};
+
+template <>
+struct VariantGetInternalPtr<Set> {
+	static Set *get_ptr(Variant *v) { return VariantInternal::get_set(v); }
+	static const Set *get_ptr(const Variant *v) { return VariantInternal::get_set(v); }
 };
 
 template <>

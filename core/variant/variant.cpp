@@ -138,6 +138,10 @@ String Variant::get_type_name(Variant::Type p_type) {
 		case ARRAY: {
 			return "Array";
 		}
+		case SET: {
+			return "Set";
+		}
+
 
 		// Arrays.
 		case PACKED_BYTE_ARRAY: {

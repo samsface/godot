@@ -59,6 +59,7 @@
 #include "core/variant/array.h"
 #include "core/variant/callable.h"
 #include "core/variant/dictionary.h"
+#include "core/variant/set.h"
 
 class Object;
 
@@ -114,6 +115,7 @@ public:
 		SIGNAL,
 		DICTIONARY,
 		ARRAY,
+		SET,
 
 		// typed arrays
 		PACKED_BYTE_ARRAY,

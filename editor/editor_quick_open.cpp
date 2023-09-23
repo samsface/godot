@@ -33,6 +33,7 @@
 #include "core/os/keyboard.h"
 #include "editor/editor_node.h"
 #include "editor/editor_scale.h"
+#include "fuzzy_search.h"
 
 Rect2i EditorQuickOpen::prev_rect = Rect2i();
 bool EditorQuickOpen::was_showed = false;
@@ -91,35 +92,25 @@ void EditorQuickOpen::_build_search_cache(EditorFileSystemDirectory *p_efsd) {
 }
 
 void EditorQuickOpen::_update_search() {
-	const String search_text = search_box->get_text();
-	const bool empty_search = search_text.is_empty();
+	FuzzySearch fuzzy_search;
+	fuzzy_search.set_query(search_box->get_text());
 
 	// Filter possible candidates.
-	Vector<Entry> entries;
 	for (int i = 0; i < files.size(); i++) {
-		if (empty_search || search_text.is_subsequence_ofn(files[i])) {
-			Entry r;
-			r.path = files[i];
-			r.score = empty_search ? 0 : _score_path(search_text, files[i].to_lower());
-			entries.push_back(r);
-		}
+		fuzzy_search.fuzzy_search_path(files[i]);
 	}
 
 	// Display results
 	TreeItem *root = search_options->get_root();
 	root->clear_children();
 
-	if (entries.size() > 0) {
-		if (!empty_search) {
-			SortArray<Entry, EntryComparator> sorter;
-			sorter.sort(entries.ptrw(), entries.size());
-		}
-
-		const int entry_limit = MIN(entries.size(), 300);
-		for (int i = 0; i < entry_limit; i++) {
+	const Vector<FuzzySearchResult>& results = fuzzy_search.commit();
+	if (results.size() > 0) {
+		for (int i = 0; i < results.size(); i++) {
 			TreeItem *ti = search_options->create_item(root);
-			ti->set_text(0, entries[i].path);
-			ti->set_icon(0, *icons.lookup_ptr(entries[i].path.get_extension()));
+			ti->set_text(0, FuzzySearch::decorate(results[i]));
+			ti->set_metadata(0, results[i].target); // todo use this for click events and stuff
+			ti->set_icon(0, *icons.lookup_ptr(results[i].target.get_extension()));
 		}
 
 		TreeItem *to_select = root->get_first_child();
@@ -133,25 +124,6 @@ void EditorQuickOpen::_update_search() {
 
 		get_ok_button()->set_disabled(true);
 	}
-}
-
-float EditorQuickOpen::_score_path(const String &p_search, const String &p_path) {
-	float score = 0.9f + .1f * (p_search.length() / (float)p_path.length());
-
-	// Exact match.
-	if (p_search == p_path) {
-		return 1.2f;
-	}
-
-	// Positive bias for matches close to the beginning of the file name.
-	String file = p_path.get_file();
-	int pos = file.findn(p_search);
-	if (pos != -1) {
-		return score * (1.0f - 0.1f * (float(pos) / file.length()));
-	}
-
-	// Similarity
-	return p_path.to_lower().similarity(p_search.to_lower());
 }
 
 void EditorQuickOpen::_confirmed() {

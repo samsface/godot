@@ -31,68 +31,48 @@
 #include "fuzzy_search.h"
 #include "core/string/ustring.h"
 #include "core/variant/variant.h"
-#include "modules/regex/regex.h"
 #include "scene/gui/tree.h"
 
 const int max_results = 100;
+const int max_misses = 2;
+const int short_query_cutoff = 3;
 const float cull_factor = 0.5f;
+const String boundary_chars = "/\\-_.";
 
-Vector<int> FuzzySearchResult::get_matches() const {
-	Vector<int> matches_array;
-
-	for (int i : matches) {
-		matches_array.push_back(i);
-	}
-
-	matches_array.sort();
-
-	return matches_array;
+Ref<FuzzySearchResult> new_search_result(const String &p_target) {
+	Ref<FuzzySearchResult> result;
+	result.instantiate();
+	result->target = p_target;
+	result->score = 0;
+	result->bonus_index = p_target.rfind_char('/');
+	return result;
 }
 
-const Vector<int> &FuzzySearchResult::get_matches_as_substr_sequences() const {
-	if (matches.is_empty()) {
-		return m_matches_as_substr_sequences_cache;
+bool is_on_boundary(const String& str, const int index) {
+	if (index == -1 || index == str.size()) {
+		return true;
 	}
-
-	// Considering this function may be called every scroll of a search list;
-	// better to cache this.
-	if (!m_matches_as_substr_sequences_cache.is_empty()) {
-		return m_matches_as_substr_sequences_cache;
-	}
-
-	Vector<int> matches_array = get_matches();
-
-	for (int i = 0; i < matches_array.size(); i++) {
-		int begin = i;
-		while ((i < matches.size() - 1) && (matches_array[i] + 1) == matches_array[i + 1]) {
-			i++;
-		}
-
-		m_matches_as_substr_sequences_cache.push_back(matches_array[begin]);
-		m_matches_as_substr_sequences_cache.push_back(matches_array[i] - matches_array[begin] + 1);
-	}
-
-	return m_matches_as_substr_sequences_cache;
+	return boundary_chars.find_char(str[index]) >= 0;
 }
 
-PackedStringArray get_query(const String &p_query) {
-	PackedStringArray query_tokens;
-
-	Ref<RegEx> split_query_regex = RegEx::create_from_string("[^\\/\\s]+");
-	TypedArray<RegExMatch> query_token_matches = split_query_regex->search_all(p_query);
-
-	for (int i = 0; i < query_token_matches.size(); i++) {
-		Ref<RegExMatch> query_token_match = query_token_matches[i];
-
-		PackedStringArray strings = query_token_match->get_strings();
-		if (strings.is_empty()) {
-			continue;
-		}
-
-		query_tokens.append(strings[0]);
+void FuzzySearchResult::add_and_score_substring(const int p_start, const int p_length, const int p_query_length) {
+	matched_substring_pairs.append(p_start);
+	matched_substring_pairs.append(p_length);
+	// Score longer substrings higher than short substrings
+	int substring_score = p_length * p_length * p_length;
+	// Score matches deeper in path higher than shallower matches
+	if (p_start > bonus_index) {
+		substring_score *= 2;
 	}
-
-	return query_tokens;
+	// Score matches on a word boundary higher than matches within a word
+	if (is_on_boundary(target, p_start - 1) || is_on_boundary(target, p_start + p_length)) {
+		substring_score += 2;
+	}
+	// Score exact query matches higher than non-compact subsequence matches
+	if (p_length == p_query_length) {
+		substring_score *= 3;
+	}
+	score += substring_score;
 }
 
 Vector<Ref<FuzzySearchResult>> sort_and_filter(const Vector<Ref<FuzzySearchResult>> &p_results) {
@@ -102,38 +82,48 @@ Vector<Ref<FuzzySearchResult>> sort_and_filter(const Vector<Ref<FuzzySearchResul
 		return res;
 	}
 
-	float total_score = 0;
+	float avg_score = 0;
+
 	for (const Ref<FuzzySearchResult> &result : p_results) {
-		total_score += result->score;
+		if (result->score > avg_score) {
+			avg_score += result->score;
+		}
 	}
 
-	float mean_score = total_score / p_results.size();
+	avg_score /= p_results.size();
+	float cull_score = avg_score * cull_factor;
 
 	struct FuzzySearchResultComparator {
 		bool operator()(const Ref<FuzzySearchResult> &A, const Ref<FuzzySearchResult> &B) const {
+			// Sort on (score, length, alphanumeric) to ensure consistent ordering
+			if (A->score == B->score) {
+				if (A->target.length() == B->target.length()) {
+					return A->target < B->target;
+				}
+				return A->target.length() < B->target.length();
+			}
 			return A->score > B->score;
 		}
 	};
 
 	// Prune low score entries before even sorting
 	for (Ref<FuzzySearchResult> i : p_results) {
-		if (i->score >= mean_score * cull_factor) {
+		if (i->score >= cull_score) {
 			res.push_back(i);
-		}
-
-		if (res.size() > max_results) {
-			break;
 		}
 	}
 
-	SortArray<Ref<FuzzySearchResult>, FuzzySearchResultComparator> sorter;
-	sorter.sort(res.ptrw(), res.size());
+	res.sort_custom<FuzzySearchResultComparator>();
+
+	if (res.size() > max_results) {
+		res.resize(max_results);
+	}
 
 	return res;
 }
 
-Ref<FuzzySearchResult> fuzzy_search(const String &p_query, const String &p_target, int position_offset) {
-	if (p_query.is_empty()) {
+Ref<FuzzySearchResult> fuzzy_search(const PackedStringArray &p_query, const String &p_target, bool case_sensitive) {
+	if (p_query.size() == 0) {
 		return nullptr;
 	}
 
@@ -141,164 +131,98 @@ Ref<FuzzySearchResult> fuzzy_search(const String &p_query, const String &p_targe
 		return nullptr;
 	}
 
-	// Convert strings to lowercase
-	String str1 = p_query.to_lower();
-	String str2 = p_target.to_lower();
-
-	int lenStr1 = str1.length();
-	int lenStr2 = str2.length();
-
-	int n = lenStr1 + 1;
-	int m = lenStr2 + 1;
-	int beginIdx = m + 1;
-
-	// Create a flat array to store the edit distances
-	Vector<int> dp;
-	// And another array to store the counts of sequences that match
-	Vector<int> matches;
-	for (int i = 0; i < n * m; i++) {
-		dp.append(0);
-		matches.append(0);
-	}
-
-	// Calculate the edit distances
-	for (int i = 1; i < n; i++) {
-		for (int j = 1; j < m; j++) {
-			int currentIdx = i * m + j;
-			int northWestIdx = currentIdx - (m + 1);
-			int westIdx = currentIdx - 1;
-
-			int score = 0;
-
-			if (dp[northWestIdx] == 0 && i > 1) {
-				score = 0;
-			} else if (str1[i - 1] == str2[j - 1]) {
-				score = 1;
-
-				// Boost score if beginging of word
-				if (currentIdx == beginIdx) {
-					score += 8;
-				}
-
-				matches.set(currentIdx, matches[northWestIdx] + 1);
-
-				// Boost score if we're on a match streak
-				score += matches[currentIdx] * 5;
-			}
-
-			if (score && (dp[northWestIdx] + score) >= dp[westIdx]) {
-				score = score + dp[northWestIdx];
-			} else {
-				score = dp[westIdx];
-			}
-
-			dp.set(currentIdx, score);
-		}
-	}
-
-	// The bottom-right cell of the matrix contains the Levenshtein distance
-	int mostSouthWestIdx = lenStr2 * (lenStr1 + 1) + lenStr1;
-
-	if (dp[mostSouthWestIdx] == 0) {
-		return nullptr;
-	}
-
-	Ref<FuzzySearchResult> res;
-	res.instantiate();
-	res->score = dp[mostSouthWestIdx];
-
-	int p = mostSouthWestIdx;
-
-	// Walk back through the matches and get all matched chars.
-	// Useful for highlighting match characters in search result UX.
-	while (p > 0) {
-		if (matches[p] > 0) {
-			res->matches.insert(((p % m) - 1) + position_offset);
-			p -= m;
-		}
-
-		p -= 1;
-	}
-
-	return res;
-}
-
-// Iterate over every component in the path and use the highest scoring match as the result.
-// Also weights the final component's score massively heaiver considering people tend to search for files, not directories.
-Ref<FuzzySearchResult> fuzzy_search_path_components(const String &p_query_token, const PackedStringArray &p_path_components) {
-	Ref<FuzzySearchResult> result;
-
+	String adjusted_target = case_sensitive ? p_target : p_target.to_lower();
+	Ref<FuzzySearchResult> result = new_search_result(p_target);
+	bool any_match = false;
 	int offset = 0;
+	int misses = 0;
 
-	for (int i = 0; i < p_path_components.size(); i++) {
-		bool end_of_path = i == p_path_components.size() - 1;
-
-		Ref<FuzzySearchResult> res = fuzzy_search(p_query_token, p_path_components[i], offset);
-		offset += p_path_components[i].length() + 1;
-
-		if (res.is_null() || res->score == 0) {
-			continue;
-		}
-
-		if (end_of_path) {
-			res->score *= 100;
-		}
-
-		if (result.is_null()) {
-			result = res;
-		} else if (res->score > result->score) {
-			result = res;
+	// Special case exact matches on very short queries
+	if (p_query.size() == 1 && p_query[0].length() <= short_query_cutoff) {
+		int index = adjusted_target.rfind(p_query[0]);
+		if (index >= 0) {
+			result->add_and_score_substring(index, p_query[0].length(), p_query[0].length());
+			return result;
 		}
 	}
 
-	return result;
-}
+	for (int i = p_query.size() - 1; i >= 0; i--) {
+		const String &part = p_query[i];
+		int part_len = part.length();
 
-Ref<FuzzySearchResult> fuzzy_search_path(const PackedStringArray &p_query_tokens, const String &p_path) {
-	Ref<FuzzySearchResult> result;
+		// Finds the starting offset for the latest instance of subsequence query_part in p_target.
+		for (int j = part_len - 1; j >= 0; j--) {
+			int new_offset = adjusted_target.rfind_char(part[j], offset - 1);
+			if (new_offset < 0 || (new_offset == 0 && j > 0)) {
+				if (++misses > max_misses) {
+					return nullptr;
+				}
+			} else {
+				offset = new_offset;
+				any_match = true;
+			}
+		}
 
-	PackedStringArray target = p_path.to_lower().split("/");
-
-	for (const String &query_token : p_query_tokens) {
-		Ref<FuzzySearchResult> res = fuzzy_search_path_components(query_token, target);
-		if (res.is_null()) {
+		// Disallow "matching" only on missed characters
+		if (!any_match) {
 			return nullptr;
 		}
 
-		if (result.is_null()) {
-			result = res;
-			result->target = p_path;
-		} else {
-			result->score += res->score;
-		}
+		int forward_offset = offset;
+		int run_start = offset;
+		int run_length = 1;
 
-		for (int match : res->matches) {
-			result->matches.insert(match);
+		// Forward-searches the same subsequence from that offset to bias for more compact representation
+		// in cases with multiple subsequences. Inspired by FuzzyMatchV1 in fzf. Additionally, record each
+		// substring in the subsequence for scoring and display.
+		for (int j = 1; j < part_len; j++) {
+			int new_offset = adjusted_target.find_char(part[j], forward_offset + 1);
+			if (new_offset > 0) {
+				forward_offset = new_offset;
+				if (run_start + run_length != forward_offset) {
+					result->add_and_score_substring(run_start, run_length, part_len);
+					run_start = forward_offset;
+					run_length = 1;
+				} else {
+					run_length += 1;
+				}
+			}
 		}
+		result->add_and_score_substring(run_start, run_length, part_len);
 	}
 
 	return result;
 }
 
-Vector<Ref<FuzzySearchResult>> FuzzySearch::search_all(const String &p_query_tokens, const PackedStringArray &p_search_data) {
+const PackedStringArray _split_query(const String& p_query) {
+	return p_query.split(" ", false);
+}
+
+Ref<FuzzySearchResult> FuzzySearch::search(const String &p_query, const String &p_target) {
+	if (p_query.is_empty()) {
+		return new_search_result(p_target);
+	}
+
+	return fuzzy_search(_split_query(p_query), p_target, !p_query.is_lowercase());
+}
+
+Vector<Ref<FuzzySearchResult>> FuzzySearch::search_all(const String &p_query, const PackedStringArray &p_targets) {
 	Vector<Ref<FuzzySearchResult>> res;
 
 	// Just spit out the results list if no query is given.
-	if (p_query_tokens.is_empty()) {
-		for (int i = 0; (i < max_results) && (i < p_search_data.size()); i++) {
-			Ref<FuzzySearchResult> r;
-			r.instantiate();
-			r->target = p_search_data[i];
-			res.push_back(r);
+	if (p_query.is_empty()) {
+		for (int i = 0; (i < max_results) && (i < p_targets.size()); i++) {
+			res.push_back(new_search_result(p_targets[i]));
 		}
 
 		return res;
 	}
 
-	PackedStringArray query_tokens = get_query(p_query_tokens);
+	bool case_sensitive = !p_query.is_lowercase();
+	PackedStringArray query_parts = _split_query(p_query);
 
-	for (const String &search_line : p_search_data) {
-		Ref<FuzzySearchResult> r = fuzzy_search_path(query_tokens, search_line);
+	for (const String &target : p_targets) {
+		Ref<FuzzySearchResult> r = fuzzy_search(query_parts, target, case_sensitive);
 		if (!r.is_null()) {
 			res.append(r);
 		}
@@ -306,55 +230,6 @@ Vector<Ref<FuzzySearchResult>> FuzzySearch::search_all(const String &p_query_tok
 
 	return sort_and_filter(res);
 }
-
-/*
-// old search function
-// maybe should leave this as a config option
-float score_path(const String &p_search, const String &p_path) {
-	if(!p_search.is_subsequence_ofn(p_path)) {
-		return 0.0;
-	}
-
-	float score = 0.9f + .1f * (p_search.length() / (float)p_path.length());
-
-	// Exact match.
-	if (p_search == p_path) {
-		return 1.2f;
-	}
-
-	// Positive bias for matches close to the beginning of the file name.
-	String file = p_path.get_file();
-	int pos = file.findn(p_search);
-	if (pos != -1) {
-		return score * (1.0f - 0.1f * (float(pos) / file.length()));
-	}
-
-	// Similarity
-	return p_path.to_lower().similarity(p_search.to_lower());
-}
-
-
-Vector<Ref<FuzzySearchResult>> FuzzySearch::search_all(const String& p_query_tokens, const PackedStringArray &p_search_data) {
-	Vector<Ref<FuzzySearchResult>> res;
-
-	PackedStringArray query_tokens = get_query(p_query_tokens);
-
-	for(const String& search_line : p_search_data) {
-		float score = score_path(p_query_tokens, search_line) * 100.0;
-		if(score > 0) {
-			Ref<FuzzySearchResult> r;
-			r.instantiate();
-			r->target = search_line;
-			r->score = score;
-			res.append(r);
-		}
-	}
-
-	sort_and_filter(res);
-
-	return res;
-}
-*/
 
 void FuzzySearch::draw_matches(Tree *p_tree) {
 	if (p_tree == nullptr) {
@@ -372,8 +247,10 @@ void FuzzySearch::draw_matches(Tree *p_tree) {
 	}
 
 	int font_size = p_tree->get_theme_font_size("font_size");
+	Vector2 position_adjust = Vector2(0, -3);
+	Vector2 size_adjust = Vector2(1, 0);
 
-	Vector2 margin_and_scroll_offset = -p_tree->get_scroll();
+	Vector2 margin_and_scroll_offset = -p_tree->get_scroll() + position_adjust;
 	margin_and_scroll_offset.x += p_tree->get_theme_constant("item_margin");
 	margin_and_scroll_offset.y += font->get_string_size("A", HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).y;
 
@@ -388,7 +265,7 @@ void FuzzySearch::draw_matches(Tree *p_tree) {
 	while (head != nullptr && head->is_visible()) {
 		Ref<FuzzySearchResult> fuzzy_search_result = head->get_metadata(0);
 		if (fuzzy_search_result.is_valid()) {
-			const Vector<int> &substr_sequences = fuzzy_search_result->get_matches_as_substr_sequences();
+			const Vector<int> &substr_sequences = fuzzy_search_result->matched_substring_pairs;
 
 			for (int i = 0; i < substr_sequences.size(); i += 2) {
 				String str_left_of_match = fuzzy_search_result->target.substr(0, substr_sequences[i]);
@@ -399,7 +276,7 @@ void FuzzySearch::draw_matches(Tree *p_tree) {
 				position += p_tree->get_item_rect(head, 0).position;
 				position += margin_and_scroll_offset;
 
-				Vector2 size = font->get_string_size(match_str, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size);
+				Vector2 size = font->get_string_size(match_str, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size) + size_adjust;
 
 				p_tree->draw_rect(Rect2(position, size), Color(1, 1, 1, 0.07), true);
 				p_tree->draw_rect(Rect2(position, size), Color(0.5, 0.7, 1.0, 0.4), false, 1);

@@ -93,7 +93,6 @@ void EditorQuickOpen::_build_search_cache(EditorFileSystemDirectory *p_efsd) {
 }
 
 void EditorQuickOpen::_update_search() {
-	// Display results
 	TreeItem *root = search_options->get_root();
 	root->clear_children();
 

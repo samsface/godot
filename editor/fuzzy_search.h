@@ -32,7 +32,6 @@
 #define FUZZY_SEARCH_H
 
 #include "core/object/ref_counted.h"
-#include "core/templates/rb_set.h"
 #include "core/variant/array.h"
 #include "core/variant/variant.h"
 
@@ -44,23 +43,21 @@ class FuzzySearchResult : public RefCounted {
 protected:
 	static void _bind_methods() {}
 
-	mutable Vector<int> m_matches_as_substr_sequences_cache;
-
 public:
 	String target;
 	int score{};
-	RBSet<int> matches;
+	int bonus_index = -1;
+	Vector<int> matched_substring_pairs;
 
-	Vector<int> get_matches() const;
-
-	const Vector<int> &get_matches_as_substr_sequences() const;
+	void add_and_score_substring(const int p_start, const int p_length, const int p_query_length);
 };
 
 class FuzzySearch : public RefCounted {
 	GDCLASS(FuzzySearch, RefCounted);
 
 public:
-	static Vector<Ref<FuzzySearchResult>> search_all(const String &p_query_tokens, const PackedStringArray &p_search_data);
+	static Ref<FuzzySearchResult> search(const String &p_query, const String &p_target);
+	static Vector<Ref<FuzzySearchResult>> search_all(const String &p_query, const PackedStringArray &p_search_data);
 	static void draw_matches(Tree *p_tree);
 };
 

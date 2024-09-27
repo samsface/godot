@@ -76,10 +76,10 @@ void FuzzySearchResult::add_and_score_substring(const int p_start, const int p_l
 }
 
 Vector<Ref<FuzzySearchResult>> sort_and_filter(const Vector<Ref<FuzzySearchResult>> &p_results) {
-	Vector<Ref<FuzzySearchResult>> res;
+	Vector<Ref<FuzzySearchResult>> results;
 
 	if (p_results.is_empty()) {
-		return res;
+		return results;
 	}
 
 	float avg_score = 0;
@@ -109,17 +109,20 @@ Vector<Ref<FuzzySearchResult>> sort_and_filter(const Vector<Ref<FuzzySearchResul
 	// Prune low score entries before even sorting
 	for (Ref<FuzzySearchResult> i : p_results) {
 		if (i->score >= cull_score) {
-			res.push_back(i);
+			results.push_back(i);
 		}
 	}
 
-	res.sort_custom<FuzzySearchResultComparator>();
+	SortArray<Ref<FuzzySearchResult>, FuzzySearchResultComparator> sorter;
 
-	if (res.size() > max_results) {
-		res.resize(max_results);
+	if (results.size() > max_results) {
+		sorter.partial_sort(0, results.size(), max_results, results.ptrw());
+		results.resize(max_results);
+	} else {
+		sorter.sort(results.ptrw(), results.size());
 	}
 
-	return res;
+	return results;
 }
 
 Ref<FuzzySearchResult> fuzzy_search(const PackedStringArray &p_query, const String &p_target, bool case_sensitive) {

@@ -37,6 +37,25 @@
 
 class Tree;
 
+class FuzzyTokenMatch : public RefCounted {
+	GDCLASS(FuzzyTokenMatch, RefCounted);
+
+protected:
+	static void _bind_methods() {}
+
+public:
+	int score{};
+	int token_length;
+	int matched_length{};
+	Vector2i interval = Vector2i(-1, -1);  // x and y are both inclusive indices
+	Vector<Vector2i> substrings;  // x is start index, y is length
+
+	void add_substring(const int substring_start, const int substring_length);
+	bool intersects(const Vector2i other_interval);
+
+	_FORCE_INLINE_ int misses() const { return token_length - matched_length; }
+};
+
 class FuzzySearchResult : public RefCounted {
 	GDCLASS(FuzzySearchResult, RefCounted);
 
@@ -47,9 +66,13 @@ public:
 	String target;
 	int score{};
 	int bonus_index = -1;
-	Vector<int> matched_substring_pairs;
+	int miss_budget{};
+	Vector2i match_interval = Vector2i(-1, -1);
+	Vector<Ref<FuzzyTokenMatch>> token_matches;
 
-	void add_and_score_substring(const int p_start, const int p_length, const int p_query_length);
+	bool can_add_token_match(Ref<FuzzyTokenMatch> &p_match);
+	void score_token_match(Ref<FuzzyTokenMatch> &p_match);
+	void add_token_match(Ref<FuzzyTokenMatch> &p_match);
 };
 
 class FuzzySearch : public RefCounted {

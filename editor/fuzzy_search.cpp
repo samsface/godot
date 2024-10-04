@@ -36,7 +36,7 @@
 const int max_results = 100;
 const int max_misses = 2;
 const int short_query_cutoff = 3;
-const float cull_factor = 0.5f;
+const float cull_factor = 0.8f;
 const String boundary_chars = "/\\-_.";
 
 bool is_valid_interval(Vector2i p_interval) {
@@ -111,22 +111,25 @@ bool FuzzySearchResult::can_add_token_match(Ref<FuzzyTokenMatch> &p_match) {
 }
 
 void FuzzySearchResult::score_token_match(Ref<FuzzyTokenMatch> &p_match) {
+	// This can always be tweaked more. The intuition is that exact matches should almost always
+	// be prioritized over broken up matches, and other criteria more or less act as tie breakers.
+
 	p_match->score = 0;
 
 	for (Vector2i substring : p_match->substrings) {
 		// Score longer substrings higher than short substrings
-		int substring_score = substring.y * substring.y * substring.y;
+		int substring_score = substring.y * substring.y;
 		// Score matches deeper in path higher than shallower matches
 		if (substring.x > bonus_index) {
 			substring_score *= 2;
 		}
 		// Score matches on a word boundary higher than matches within a word
 		if (is_word_boundary(target, substring.x - 1) || is_word_boundary(target, substring.x + substring.y)) {
-			substring_score += 2;
+			substring_score += 4;
 		}
 		// Score exact query matches higher than non-compact subsequence matches
 		if (substring.y == p_match->token_length) {
-			substring_score *= 3;
+			substring_score += 100;
 		}
 		p_match->score += substring_score;
 	}
@@ -154,6 +157,8 @@ Vector<Ref<FuzzySearchResult>> sort_and_filter(const Vector<Ref<FuzzySearchResul
 		}
 	}
 
+	// TODO: Tune scoring and culling here to display fewer subsequence soup matches when good matches
+	//  are available.
 	avg_score /= p_results.size();
 	float cull_score = avg_score * cull_factor;
 
@@ -238,19 +243,7 @@ Ref<FuzzySearchResult> fuzzy_search(const PackedStringArray &p_query, const Stri
 	}
 
 	String adjusted_target = case_sensitive ? p_target : p_target.to_lower();
-	int target_len = adjusted_target.length();
 	Ref<FuzzySearchResult> result = new_search_result(p_target);
-
-	// Special case exact matches on very short queries
-	if (p_query.size() == 1 && p_query[0].length() <= short_query_cutoff) {
-		int index = adjusted_target.rfind(p_query[0]);
-		if (index >= 0) {
-			Ref<FuzzyTokenMatch> match = new_token_match(p_query[0]);
-			match->add_substring(index, match->token_length);
-			result->add_token_match(match);
-			return result;
-		}
-	}
 
 	// For each token, eagerly generate subsequences starting from index 0 and keep the best scoring one
 	// which does not conflict with prior token matches. This is not ensured to find the highest scoring

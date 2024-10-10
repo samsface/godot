@@ -31,7 +31,8 @@
 #ifndef TEST_FUZZY_SEARCH_H
 #define TEST_FUZZY_SEARCH_H
 
-#include "core/string/fuzzy_search.h"
+#include "core/string/fuzzy_search_v1.h"
+#include "core/string/fuzzy_search_v2.h"
 #include "tests/test_macros.h"
 #include <iostream>
 #include <chrono>
@@ -65,7 +66,6 @@ auto bench(String query, String dataset_path, String expected_result, String alg
 	auto data = some_project_dir_tree->get_as_utf8_string().split("\n");
 	CHECK(data.size() > 0);
 
-
 	Vector<int> results;
 	String top_result;
 
@@ -76,14 +76,16 @@ auto bench(String query, String dataset_path, String expected_result, String alg
 		for(int j = 0; j < 10; j++) {
 			auto start = std::chrono::high_resolution_clock::now();
 
-			Ref<FuzzySearch> fuzzySearch{};
-
-			Vector<Ref<FuzzySearchResult>> res;
-			if(algorithm == "lev") {
-				res = fuzzySearch->search_all_lev(query, data);
-			}
-			else {
-				res = fuzzySearch->search_all(query, data);
+			if (algorithm == "v1") {
+				Vector<Ref<FuzzySearchResultV1>> res = FuzzySearchV1::search_all(query, data);
+				if(res.size() > 0) {
+					top_result = res[0]->target;
+				}
+			} else if (algorithm == "v2") {
+				Vector<Ref<FuzzySearchResultV2>> res = FuzzySearchV2::search_all(query, data);
+				if(res.size() > 0) {
+					top_result = res[0]->target;
+				}
 			}
 
 			auto end = std::chrono::high_resolution_clock::now();
@@ -92,16 +94,13 @@ auto bench(String query, String dataset_path, String expected_result, String alg
 
 			results.push_back(duration);
 
-			if(res.size() > 0) {
-				top_result = res[0]->target;
-			}
 		}
 	}
 
 	MESSAGE(algorithm, ",", query, ",", dataset_path, ",", calculateStdDev(results), ",", calculateMean(results), ",", top_result);
 }
 
-TEST_CASE("[FuzzySearch] Find Stuff") {
+TEST_CASE("[Stress][FuzzySearch] Find Stuff") {
 	Ref<FileAccess> tests = FileAccess::open(TestUtils::get_data_path("fuzzy_search/fuzzy_search_tests.txt"), FileAccess::READ);
 	REQUIRE(!tests.is_null());
 
@@ -119,8 +118,8 @@ TEST_CASE("[FuzzySearch] Find Stuff") {
 		auto dataset_path = line[1];
 		auto expected_result = line[2];
 
-		bench(query, dataset_path, expected_result, "fzf");
-		bench(query, dataset_path, expected_result, "lev");
+		bench(query, dataset_path, expected_result, "v1");
+		bench(query, dataset_path, expected_result, "v2");
 	}
 }
 

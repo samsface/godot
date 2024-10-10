@@ -328,9 +328,6 @@ void FuzzySearchV2::draw_matches(Tree *p_tree) {
 	margin_and_scroll_offset.x += p_tree->get_theme_constant("item_margin");
 	margin_and_scroll_offset.y += font->get_string_size("A", HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).y;
 
-	Vector2 magic_numbers = Vector2(23, -5);
-	margin_and_scroll_offset += magic_numbers;
-
 	Ref<Texture2D> icon = head->get_icon(0);
 	if (icon.is_valid()) {
 		margin_and_scroll_offset.x += icon->get_width();

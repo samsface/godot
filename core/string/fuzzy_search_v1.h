@@ -28,8 +28,8 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
 
-#ifndef FUZZY_SEARCH_H
-#define FUZZY_SEARCH_H
+#ifndef FUZZY_SEARCH_V1_H
+#define FUZZY_SEARCH_V1_H
 
 #include "core/object/ref_counted.h"
 #include "core/templates/rb_set.h"
@@ -38,8 +38,8 @@
 
 class Tree;
 
-class FuzzySearchResult : public RefCounted {
-	GDCLASS(FuzzySearchResult, RefCounted);
+class FuzzySearchResultV1 : public RefCounted {
+	GDCLASS(FuzzySearchResultV1, RefCounted);
 
 protected:
 	static void _bind_methods() {}
@@ -50,7 +50,6 @@ public:
 	String target;
 	int score{};
 	RBSet<int> matches;
-	int bonus_index = -1;
 	Vector<int> matched_substring_pairs;
 
 	Vector<int> get_matches() const;
@@ -60,13 +59,12 @@ public:
 	void add_and_score_substring(const int p_start, const int p_length, const int p_query_length);
 };
 
-class FuzzySearch : public RefCounted {
-	GDCLASS(FuzzySearch, RefCounted);
+class FuzzySearchV1 : public RefCounted {
+	GDCLASS(FuzzySearchV1, RefCounted);
 
 public:
-	static Vector<Ref<FuzzySearchResult>> search_all_lev(const String &p_query_tokens, const PackedStringArray &p_search_data);
-	static Vector<Ref<FuzzySearchResult>> search_all(const String &p_query_tokens, const PackedStringArray &p_search_data);
+	static Vector<Ref<FuzzySearchResultV1>> search_all(const String &p_query_tokens, const PackedStringArray &p_search_data);
 	static void draw_matches(Tree *p_tree);
 };
 
-#endif // FUZZY_SEARCH_H
+#endif // FUZZY_SEARCH_V1_H

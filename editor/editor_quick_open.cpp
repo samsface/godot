@@ -34,8 +34,7 @@
 #include "editor/editor_node.h"
 #include "editor/editor_string_names.h"
 #include "editor/themes/editor_scale.h"
-#include "fuzzy_search_v2.h"
-#include "core/string/fuzzy_search.h"
+#include "core/string/fuzzy_search_v2.h"
 
 Rect2i EditorQuickOpen::prev_rect = Rect2i();
 bool EditorQuickOpen::was_showed = false;

@@ -79,9 +79,8 @@ class FuzzySearchV2 : public RefCounted {
 	GDCLASS(FuzzySearchV2, RefCounted);
 
 public:
-	static Ref<FuzzySearchResultV2> search(const String &p_query, const String &p_target);
 	static Vector<Ref<FuzzySearchResultV2>> search_all(const String &p_query, const PackedStringArray &p_search_data);
 	static void draw_matches(Tree *p_tree);
 };
 
-#endif // FUZZY_SEARCH_H
+#endif // FUZZY_SEARCH_V2_H

@@ -28,14 +28,13 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
 
-#include "fuzzy_search.h"
+#include "fuzzy_search_v2.h"
 #include "core/string/ustring.h"
 #include "core/variant/variant.h"
 #include "scene/gui/tree.h"
 
 const int max_results = 100;
 const int max_misses = 2;
-const int short_query_cutoff = 3;
 const float cull_factor = 0.8f;
 const String boundary_chars = "/\\-_.";
 
@@ -75,8 +74,8 @@ bool FuzzyTokenMatch::intersects(const Vector2i other_interval) {
 	return interval.y >= other_interval.x && interval.x <= other_interval.y;
 }
 
-Ref<FuzzySearchResult> new_search_result(const String &p_target) {
-	Ref<FuzzySearchResult> result;
+Ref<FuzzySearchResultV2> new_search_result(const String &p_target) {
+	Ref<FuzzySearchResultV2> result;
 	result.instantiate();
 	result->target = p_target;
 	result->bonus_index = p_target.rfind_char('/');
@@ -91,7 +90,7 @@ bool is_word_boundary(const String& str, const int index) {
 	return boundary_chars.find_char(str[index]) >= 0;
 }
 
-bool FuzzySearchResult::can_add_token_match(Ref<FuzzyTokenMatch> &p_match) {
+bool FuzzySearchResultV2::can_add_token_match(Ref<FuzzyTokenMatch> &p_match) {
 	if (p_match.is_null() || p_match->misses() > miss_budget) {
 		return false;
 	}
@@ -110,7 +109,7 @@ bool FuzzySearchResult::can_add_token_match(Ref<FuzzyTokenMatch> &p_match) {
 	return true;
 }
 
-void FuzzySearchResult::score_token_match(Ref<FuzzyTokenMatch> &p_match) {
+void FuzzySearchResultV2::score_token_match(Ref<FuzzyTokenMatch> &p_match) {
 	// This can always be tweaked more. The intuition is that exact matches should almost always
 	// be prioritized over broken up matches, and other criteria more or less act as tie breakers.
 
@@ -135,15 +134,15 @@ void FuzzySearchResult::score_token_match(Ref<FuzzyTokenMatch> &p_match) {
 	}
 }
 
-void FuzzySearchResult::add_token_match(Ref<FuzzyTokenMatch>& p_match) {
+void FuzzySearchResultV2::add_token_match(Ref<FuzzyTokenMatch>& p_match) {
 	score += p_match->score;
 	match_interval = extend_interval(match_interval, p_match->interval);
 	miss_budget -= p_match->misses();
 	token_matches.append(p_match);
 }
 
-Vector<Ref<FuzzySearchResult>> sort_and_filter(const Vector<Ref<FuzzySearchResult>> &p_results) {
-	Vector<Ref<FuzzySearchResult>> results;
+Vector<Ref<FuzzySearchResultV2>> sort_and_filter(const Vector<Ref<FuzzySearchResultV2>> &p_results) {
+	Vector<Ref<FuzzySearchResultV2>> results;
 
 	if (p_results.is_empty()) {
 		return results;
@@ -151,7 +150,7 @@ Vector<Ref<FuzzySearchResult>> sort_and_filter(const Vector<Ref<FuzzySearchResul
 
 	float avg_score = 0;
 
-	for (const Ref<FuzzySearchResult> &result : p_results) {
+	for (const Ref<FuzzySearchResultV2> &result : p_results) {
 		if (result->score > avg_score) {
 			avg_score += result->score;
 		}
@@ -163,7 +162,7 @@ Vector<Ref<FuzzySearchResult>> sort_and_filter(const Vector<Ref<FuzzySearchResul
 	float cull_score = avg_score * cull_factor;
 
 	struct FuzzySearchResultComparator {
-		bool operator()(const Ref<FuzzySearchResult> &A, const Ref<FuzzySearchResult> &B) const {
+		bool operator()(const Ref<FuzzySearchResultV2> &A, const Ref<FuzzySearchResultV2> &B) const {
 			// Sort on (score, length, alphanumeric) to ensure consistent ordering
 			if (A->score == B->score) {
 				if (A->target.length() == B->target.length()) {
@@ -176,13 +175,13 @@ Vector<Ref<FuzzySearchResult>> sort_and_filter(const Vector<Ref<FuzzySearchResul
 	};
 
 	// Prune low score entries before sorting
-	for (Ref<FuzzySearchResult> i : p_results) {
+	for (Ref<FuzzySearchResultV2> i : p_results) {
 		if (i->score >= cull_score) {
 			results.push_back(i);
 		}
 	}
 
-	SortArray<Ref<FuzzySearchResult>, FuzzySearchResultComparator> sorter;
+	SortArray<Ref<FuzzySearchResultV2>, FuzzySearchResultComparator> sorter;
 
 	if (results.size() > max_results) {
 		sorter.partial_sort(0, results.size(), max_results, results.ptrw());
@@ -233,7 +232,7 @@ Ref<FuzzyTokenMatch> try_match_token(
 	return match;
 }
 
-Ref<FuzzySearchResult> fuzzy_search(const PackedStringArray &p_query, const String &p_target, bool case_sensitive) {
+Ref<FuzzySearchResultV2> fuzzy_search(const PackedStringArray &p_query, const String &p_target, bool case_sensitive) {
 	if (p_query.size() == 0) {
 		return nullptr;
 	}
@@ -243,7 +242,7 @@ Ref<FuzzySearchResult> fuzzy_search(const PackedStringArray &p_query, const Stri
 	}
 
 	String adjusted_target = case_sensitive ? p_target : p_target.to_lower();
-	Ref<FuzzySearchResult> result = new_search_result(p_target);
+	Ref<FuzzySearchResultV2> result = new_search_result(p_target);
 
 	// For each token, eagerly generate subsequences starting from index 0 and keep the best scoring one
 	// which does not conflict with prior token matches. This is not ensured to find the highest scoring
@@ -283,8 +282,8 @@ Ref<FuzzySearchResult> fuzzy_search(const PackedStringArray &p_query, const Stri
 	return result;
 }
 
-Vector<Ref<FuzzySearchResult>> FuzzySearch::search_all(const String &p_query, const PackedStringArray &p_targets) {
-	Vector<Ref<FuzzySearchResult>> res;
+Vector<Ref<FuzzySearchResultV2>> FuzzySearchV2::search_all(const String &p_query, const PackedStringArray &p_targets) {
+	Vector<Ref<FuzzySearchResultV2>> res;
 
 	// Just spit out the results list if no query is given.
 	if (p_query.is_empty()) {
@@ -299,7 +298,7 @@ Vector<Ref<FuzzySearchResult>> FuzzySearch::search_all(const String &p_query, co
 	PackedStringArray query_parts = p_query.split(" ", false);
 
 	for (const String &target : p_targets) {
-		Ref<FuzzySearchResult> r = fuzzy_search(query_parts, target, case_sensitive);
+		Ref<FuzzySearchResultV2> r = fuzzy_search(query_parts, target, case_sensitive);
 		if (!r.is_null()) {
 			res.append(r);
 		}
@@ -308,7 +307,7 @@ Vector<Ref<FuzzySearchResult>> FuzzySearch::search_all(const String &p_query, co
 	return sort_and_filter(res);
 }
 
-void FuzzySearch::draw_matches(Tree *p_tree) {
+void FuzzySearchV2::draw_matches(Tree *p_tree) {
 	if (p_tree == nullptr) {
 		return;
 	}
@@ -338,7 +337,7 @@ void FuzzySearch::draw_matches(Tree *p_tree) {
 	}
 
 	while (head != nullptr && head->is_visible()) {
-		Ref<FuzzySearchResult> fuzzy_search_result = head->get_metadata(0);
+		Ref<FuzzySearchResultV2> fuzzy_search_result = head->get_metadata(0);
 		if (fuzzy_search_result.is_valid()) {
 			for (Ref<FuzzyTokenMatch> match : fuzzy_search_result->token_matches) {
 				for (Vector2i substring : match->substrings) {

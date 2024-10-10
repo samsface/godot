@@ -34,7 +34,7 @@
 #include "editor/editor_node.h"
 #include "editor/editor_string_names.h"
 #include "editor/themes/editor_scale.h"
-#include "fuzzy_search.h"
+#include "fuzzy_search_v2.h"
 
 Rect2i EditorQuickOpen::prev_rect = Rect2i();
 bool EditorQuickOpen::was_showed = false;
@@ -96,7 +96,7 @@ void EditorQuickOpen::_update_search() {
 	TreeItem *root = search_options->get_root();
 	root->clear_children();
 
-	Vector<Ref<FuzzySearchResult>> results = FuzzySearch::search_all(search_box->get_text(), files);
+	Vector<Ref<FuzzySearchResultV2>> results = FuzzySearchV2::search_all(search_box->get_text(), files);
 
 	if (results.size() > 0) {
 		for (int i = 0; i < results.size(); i++) {
@@ -248,5 +248,5 @@ EditorQuickOpen::EditorQuickOpen() {
 }
 
 void EditorQuickOpen::_draw_search_options() {
-	FuzzySearch::draw_matches(search_options);
+	FuzzySearchV2::draw_matches(search_options);
 }

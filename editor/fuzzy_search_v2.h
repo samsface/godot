@@ -28,8 +28,8 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
 
-#ifndef FUZZY_SEARCH_H
-#define FUZZY_SEARCH_H
+#ifndef FUZZY_SEARCH_V2_H
+#define FUZZY_SEARCH_V2_H
 
 #include "core/object/ref_counted.h"
 #include "core/variant/array.h"
@@ -56,8 +56,8 @@ public:
 	_FORCE_INLINE_ int misses() const { return token_length - matched_length; }
 };
 
-class FuzzySearchResult : public RefCounted {
-	GDCLASS(FuzzySearchResult, RefCounted);
+class FuzzySearchResultV2 : public RefCounted {
+	GDCLASS(FuzzySearchResultV2, RefCounted);
 
 protected:
 	static void _bind_methods() {}
@@ -75,12 +75,12 @@ public:
 	void add_token_match(Ref<FuzzyTokenMatch> &p_match);
 };
 
-class FuzzySearch : public RefCounted {
-	GDCLASS(FuzzySearch, RefCounted);
+class FuzzySearchV2 : public RefCounted {
+	GDCLASS(FuzzySearchV2, RefCounted);
 
 public:
-	static Ref<FuzzySearchResult> search(const String &p_query, const String &p_target);
-	static Vector<Ref<FuzzySearchResult>> search_all(const String &p_query, const PackedStringArray &p_search_data);
+	static Ref<FuzzySearchResultV2> search(const String &p_query, const String &p_target);
+	static Vector<Ref<FuzzySearchResultV2>> search_all(const String &p_query, const PackedStringArray &p_search_data);
 	static void draw_matches(Tree *p_tree);
 };
 

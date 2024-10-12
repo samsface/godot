@@ -997,4 +997,3 @@
 ./entity/kill_streak/entity.tscn
 ./entity/kill_streak/kill_streak_toast.tscn
 ./entity/kill_streak/icon.png
-./entity/kill_streak/kill_streak_gun_model.gd

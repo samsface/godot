@@ -40,15 +40,19 @@ class Tree;
 class FuzzyTokenMatch : public RefCounted {
 	GDCLASS(FuzzyTokenMatch, RefCounted);
 
+	friend class FuzzySearchResult;
+	friend class FuzzySearch;
+
 protected:
+	int token_length;
+	int matched_length{};
+	Vector2i interval = Vector2i(-1, -1); // x and y are both inclusive indices
+
 	static void _bind_methods() {}
 
 public:
 	int score{};
-	int token_length;
-	int matched_length{};
-	Vector2i interval = Vector2i(-1, -1);  // x and y are both inclusive indices
-	Vector<Vector2i> substrings;  // x is start index, y is length
+	Vector<Vector2i> substrings; // x is start index, y is length
 
 	void add_substring(const int substring_start, const int substring_length);
 	bool intersects(const Vector2i other_interval);
@@ -59,15 +63,18 @@ public:
 class FuzzySearchResult : public RefCounted {
 	GDCLASS(FuzzySearchResult, RefCounted);
 
+	friend class FuzzySearch;
+
 protected:
+	int miss_budget{};
+	Vector2i match_interval = Vector2i(-1, -1);
+
 	static void _bind_methods() {}
 
 public:
 	String target;
 	int score{};
-	int bonus_index = -1;
-	int miss_budget{};
-	Vector2i match_interval = Vector2i(-1, -1);
+	int dir_index = -1;
 	Vector<Ref<FuzzyTokenMatch>> token_matches;
 
 	bool can_add_token_match(Ref<FuzzyTokenMatch> &p_match);
@@ -78,9 +85,36 @@ public:
 class FuzzySearch : public RefCounted {
 	GDCLASS(FuzzySearch, RefCounted);
 
+private:
+	void reset_match(Ref<FuzzyTokenMatch> &p_match, const String &p_token);
+	void reset_result(Ref<FuzzySearchResult> &p_result, const String &p_target);
+	Vector<Ref<FuzzySearchResult>> sort_and_filter(const Vector<Ref<FuzzySearchResult>> &p_results);
+	bool try_match_token(
+			Ref<FuzzyTokenMatch> p_match,
+			const String &p_token,
+			const String &p_target,
+			int p_offset,
+			int p_miss_budget);
+
+protected:
+	static void _bind_methods() {}
+
 public:
-	static Vector<Ref<FuzzySearchResult>> search_all(const String &p_query, const PackedStringArray &p_search_data);
-	static void draw_matches(Tree *p_tree);
+	PackedStringArray tokens;
+	bool case_sensitive = false;
+	int max_results = 100;
+	int max_misses = 2;
+	bool allow_subsequences = true;
+
+	void set_query(const String &p_query);
+	bool fuzzy_search(
+			Ref<FuzzySearchResult> p_result,
+			const String &p_target);
+	Ref<FuzzySearchResult> search(const String &p_target);
+	Vector<Ref<FuzzySearchResult>> search_all(const PackedStringArray &p_targets);
+
+	static Vector<Ref<FuzzySearchResult>> search_all(const String &p_query, const PackedStringArray &p_targets);
+	// static void draw_matches(Tree *p_tree);
 };
 
 #endif // FUZZY_SEARCH_H

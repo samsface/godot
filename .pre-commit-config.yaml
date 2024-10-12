@@ -59,7 +59,8 @@ repos:
         exclude: |
           (?x)^(
             platform/android/java/editor/src/main/java/com/android/.*|
-            platform/android/java/lib/src/com/.*
+            platform/android/java/lib/src/com/.*|
+            tests/.*\.txt
           )
         additional_dependencies: [tomli]
 

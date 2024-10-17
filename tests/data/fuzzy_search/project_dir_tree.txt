@@ -323,7 +323,7 @@
 ./entity/medpack/icon.png
 ./entity/medpack/dead.png
 ./entity/medpack/data.gd
-./entity/modell.gd
+./entity/model.gd
 ./entity/doom_transition/entity.tscn
 ./entity/doom_transition/icon.png
 ./entity/doom_transition/special.gd
@@ -424,7 +424,7 @@
 ./entity/meta_random_sound/giberish.wav
 ./entity/meta_random_sound/icon.png
 ./entity/meta_random_sound/special.gd
-./entity/meta_random_sound/woh.wav
+./entity/meta_random_sound/who.wav
 ./entity/meta_random_sound/data.gd
 ./entity/meta_random_sound/hoola_boola.wav
 ./entity/meta_random_sound/space_bandit.wav
@@ -669,7 +669,7 @@
 ./entity/crate_teleporter/entity.tscn
 ./entity/crate_teleporter/icon.png
 ./entity/crate_teleporter/data.gd
-./entity/crate_teleporter/satelite.kra
+./entity/crate_teleporter/satellite.kra
 ./entity/crate_garbage/entity.tscn
 ./entity/crate_garbage/icon.png
 ./entity/crate_garbage/data.gd
@@ -969,7 +969,7 @@
 ./entity/background_freighter/background/space.png
 ./entity/background_freighter/background/line.png
 ./entity/background_freighter/background/background2.gd
-./entity/background_freighter/background/good crate.png
+./entity/background_freighter/background/good create.png
 ./entity/background_freighter/background/backgip.png
 ./entity/background_freighter/background/background2.png
 ./entity/background_freighter/background/background.png

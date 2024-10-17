@@ -229,7 +229,14 @@ QuickOpenResultContainer::QuickOpenResultContainer() {
 		}
 	}
 
-	_update_result_items();
+	// Creating and deleting nodes while searching is slow, so we allocate
+	// a bunch of result nodes and fill in the content based on result ranking.
+	result_items.resize(EDITOR_GET(MAX_RESULTS_SETTING));
+	for (int i = 0; i < result_items.size(); i++) {
+		QuickOpenResultItem *item = memnew(QuickOpenResultItem);
+		item->connect(SceneStringName(gui_input), callable_mp(this, &QuickOpenResultContainer::_item_input).bind(i));
+		result_items.write[i] = item;
+	}
 }
 
 QuickOpenResultContainer::~QuickOpenResultContainer() {
@@ -259,29 +266,12 @@ void QuickOpenResultContainer::init(const Vector<StringName> &p_base_types) {
 	include_addons_toggle->set_pressed_no_signal(include_addons);
 	never_opened = false;
 
-	_update_result_items();
-	_create_initial_results();
-}
-
-void QuickOpenResultContainer::_update_result_items() {
-	// Potentially resize vector of cached result items
-	target_allocated_results = EDITOR_GET(MAX_RESULTS_SETTING);
-	for (int i = target_allocated_results; i < result_items.size(); i++) {
-		result_items[i]->queue_free();
-	}
-
-	int start = result_items.size();
-	result_items.resize(target_allocated_results);
-	for (int i = start; i < target_allocated_results; i++) {
-		QuickOpenResultItem *item = memnew(QuickOpenResultItem);
-		item->connect(SceneStringName(gui_input), callable_mp(this, &QuickOpenResultContainer::_item_input).bind(i));
-		result_items.write[i] = item;
-	}
-
 	const bool enable_highlights = EDITOR_GET(SEARCH_HIGHLIGHT_SETTING);
 	for (QuickOpenResultItem *E : result_items) {
 		E->enable_highlights = enable_highlights;
 	}
+
+	_create_initial_results();
 }
 
 void QuickOpenResultContainer::_create_initial_results() {
@@ -290,7 +280,7 @@ void QuickOpenResultContainer::_create_initial_results() {
 	filepaths.clear();
 	filetypes.clear();
 	_find_filepaths_in_folder(EditorFileSystem::get_singleton()->get_filesystem(), include_addons_toggle->is_pressed());
-	max_total_results = MIN(filepaths.size(), target_allocated_results);
+	max_total_results = MIN(filepaths.size(), result_items.size());
 	update_results();
 }
 

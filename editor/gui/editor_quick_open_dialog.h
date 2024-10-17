@@ -100,7 +100,6 @@ private:
 	int selection_index = -1;
 	int num_visible_results = 0;
 	int max_total_results = 0;
-	int target_allocated_results = 100;
 
 	bool showing_history = false;
 	bool never_opened = true;
@@ -125,7 +124,6 @@ private:
 
 	static QuickOpenDisplayMode get_adaptive_display_mode(const Vector<StringName> &p_base_types);
 
-	void _update_result_items();
 	void _create_initial_results();
 	void _find_filepaths_in_folder(EditorFileSystemDirectory *p_directory, bool p_include_addons);
 

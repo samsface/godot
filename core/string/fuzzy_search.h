@@ -44,7 +44,7 @@ class FuzzyTokenMatch : public RefCounted {
 	friend class FuzzySearch;
 
 protected:
-	int token_length;
+	int token_length{};
 	int matched_length{};
 	Vector2i interval = Vector2i(-1, -1); // x and y are both inclusive indices
 
@@ -54,10 +54,10 @@ public:
 	int score{};
 	Vector<Vector2i> substrings; // x is start index, y is length
 
-	void add_substring(const int substring_start, const int substring_length);
-	bool intersects(const Vector2i other_interval);
+	void add_substring(int substring_start, int substring_length);
+	bool intersects(Vector2i other_interval) const;
 
-	_FORCE_INLINE_ int misses() const { return token_length - matched_length; }
+	int misses() const { return token_length - matched_length; }
 };
 
 class FuzzySearchResult : public RefCounted {
@@ -77,7 +77,7 @@ public:
 	int dir_index = -1;
 	Vector<Ref<FuzzyTokenMatch>> token_matches;
 
-	bool can_add_token_match(Ref<FuzzyTokenMatch> &p_match);
+	bool can_add_token_match(const Ref<FuzzyTokenMatch> &p_match) const;
 	void score_token_match(Ref<FuzzyTokenMatch> &p_match);
 	void add_token_match(Ref<FuzzyTokenMatch> &p_match);
 };
@@ -86,15 +86,15 @@ class FuzzySearch : public RefCounted {
 	GDCLASS(FuzzySearch, RefCounted);
 
 private:
-	void reset_match(Ref<FuzzyTokenMatch> &p_match, const String &p_token);
-	void reset_result(Ref<FuzzySearchResult> &p_result, const String &p_target);
+	void reset_match(Ref<FuzzyTokenMatch> &p_match, const String &p_token) const;
+	void reset_result(Ref<FuzzySearchResult> &p_result, const String &p_target) const;
 	Vector<Ref<FuzzySearchResult>> sort_and_filter(const Vector<Ref<FuzzySearchResult>> &p_results);
 	bool try_match_token(
 			Ref<FuzzyTokenMatch> p_match,
 			const String &p_token,
 			const String &p_target,
 			int p_offset,
-			int p_miss_budget);
+			int p_miss_budget) const;
 
 protected:
 	static void _bind_methods() {}

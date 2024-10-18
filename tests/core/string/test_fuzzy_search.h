@@ -48,10 +48,9 @@ double calculate_mean(const Vector<double> &p_numbers) {
 	for (double num : p_numbers) {
 		sum += num;
 	}
-	return sum / (double)p_numbers.size();
+	return sum / static_cast<double>(p_numbers.size());
 }
 
-// Function to calculate standard deviation
 double calculate_std_dev(const Vector<double> &p_numbers) {
 	double mean = calculate_mean(p_numbers);
 	double variance = 0.0;
@@ -59,7 +58,7 @@ double calculate_std_dev(const Vector<double> &p_numbers) {
 	for (double num : p_numbers) {
 		variance += (num - mean) * (num - mean);
 	}
-	variance /= (double)p_numbers.size(); // Population standard deviation formula
+	variance /= static_cast<double>(p_numbers.size());
 	return std::sqrt(variance);
 }
 
@@ -110,8 +109,8 @@ auto bench(String p_query, Vector<String> p_targets) {
 			auto start = std::chrono::high_resolution_clock::now();
 			get_top_result(p_query, p_targets);
 			auto end = std::chrono::high_resolution_clock::now();
-			auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-			timings.push_back(duration / 1000.0); // Convert to ms
+			auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+			timings.push_back(duration);
 		}
 	}
 

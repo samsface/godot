@@ -64,28 +64,28 @@ Ref<FuzzySearchResult> new_search_result() {
 	return result;
 }
 
-bool is_word_boundary(const String &str, const int index) {
+bool is_word_boundary(const String &str, int index) {
 	if (index == -1 || index == str.size()) {
 		return true;
 	}
 	return boundary_chars.find_char(str[index]) >= 0;
 }
 
-void FuzzyTokenMatch::add_substring(const int substring_start, const int substring_length) {
+void FuzzyTokenMatch::add_substring(int substring_start, int substring_length) {
 	substrings.append(Vector2i(substring_start, substring_length));
 	matched_length += substring_length;
 	int substring_end = substring_start + substring_length - 1;
 	interval = extend_interval(interval, Vector2i(substring_start, substring_end));
 }
 
-bool FuzzyTokenMatch::intersects(const Vector2i other_interval) {
+bool FuzzyTokenMatch::intersects(Vector2i other_interval) const {
 	if (!is_valid_interval(interval) || !is_valid_interval(other_interval)) {
 		return false;
 	}
 	return interval.y >= other_interval.x && interval.x <= other_interval.y;
 }
 
-bool FuzzySearchResult::can_add_token_match(Ref<FuzzyTokenMatch> &p_match) {
+bool FuzzySearchResult::can_add_token_match(const Ref<FuzzyTokenMatch> &p_match) const {
 	if (p_match.is_null() || p_match->misses() > miss_budget) {
 		return false;
 	}
@@ -172,7 +172,7 @@ Vector<Ref<FuzzySearchResult>> FuzzySearch::sort_and_filter(const Vector<Ref<Fuz
 	};
 
 	// Prune low score entries before sorting
-	for (Ref<FuzzySearchResult> i : p_results) {
+	for (const Ref<FuzzySearchResult>& i : p_results) {
 		if (i->score >= cull_score) {
 			results.push_back(i);
 		}
@@ -190,7 +190,7 @@ Vector<Ref<FuzzySearchResult>> FuzzySearch::sort_and_filter(const Vector<Ref<Fuz
 	return results;
 }
 
-void FuzzySearch::reset_match(Ref<FuzzyTokenMatch> &p_match, const String &p_token) {
+void FuzzySearch::reset_match(Ref<FuzzyTokenMatch> &p_match, const String &p_token) const {
 	p_match->score = 0;
 	p_match->token_length = p_token.length();
 	p_match->matched_length = 0;
@@ -198,7 +198,7 @@ void FuzzySearch::reset_match(Ref<FuzzyTokenMatch> &p_match, const String &p_tok
 	p_match->substrings.clear();
 }
 
-void FuzzySearch::reset_result(Ref<FuzzySearchResult> &p_result, const String &p_target) {
+void FuzzySearch::reset_result(Ref<FuzzySearchResult> &p_result, const String &p_target) const {
 	p_result->score = 0;
 	p_result->target = p_target;
 	p_result->dir_index = p_target.rfind_char('/');
@@ -212,7 +212,7 @@ bool FuzzySearch::try_match_token(
 		const String &p_token,
 		const String &p_target,
 		int p_offset,
-		int p_miss_budget) {
+		int p_miss_budget) const {
 	reset_match(p_match, p_token);
 	int run_start = -1;
 	int run_len = 0;
